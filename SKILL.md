@@ -263,6 +263,29 @@ rm /tmp/keys.json  # delete immediately after use
 - Environment variable set by the orchestrator → `AGENT_KEY_PASSPHRASE`
 - Never hardcoded, never in config files, never in git
 
+**OpenBao keyfile storage flow:**
+- Store full key material at `kv/data/agent-id/<agent_id>/keys`
+- Requires `VAULT_TOKEN`; default `VAULT_ADDR` is `https://127.0.0.1:8200`
+
+```bash
+# Store agent_keys.json into OpenBao KV v2
+export VAULT_ADDR="https://127.0.0.1:8200"
+export VAULT_TOKEN="<vault-token>"
+python3 scripts/vault_keys.py store --in agent_keys.json
+
+# Override agent_id if needed
+python3 scripts/vault_keys.py store --in agent_keys.json --agent-id 00000000-0000-0000-0000-000000000001
+
+# Load from OpenBao to stdout
+python3 scripts/vault_keys.py load --agent-id 00000000-0000-0000-0000-000000000001
+
+# Load from OpenBao to a 0600 file
+python3 scripts/vault_keys.py load --agent-id 00000000-0000-0000-0000-000000000001 --out /tmp/agent_keys.json
+
+# Soft-delete the latest KV v2 version
+python3 scripts/vault_keys.py delete --agent-id 00000000-0000-0000-0000-000000000001
+```
+
 **Backup strategy:**
 - The encrypted `agent_keys.json.enc` can be stored anywhere (S3, git, etc.)
 - The passphrase must be stored separately from the keyfile
@@ -284,6 +307,7 @@ All scripts are in `scripts/`. See each file's header for usage.
 | `scripts/sign_sponsorship.py` | Sign requester's pubkey for sponsorship approval |
 | `scripts/derive_keys.py` | Derive SSH + PGP keys from master seed (HKDF) |
 | `scripts/secure_keyfile.py` | Encrypt/decrypt agent_keys.json (AES-256-GCM + scrypt) |
+| `scripts/vault_keys.py` | Store/load/delete agent_keys.json in OpenBao/Vault KV v2 |
 
 ---
 
