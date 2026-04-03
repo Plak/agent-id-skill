@@ -126,7 +126,8 @@ def pgp_pubkey_body(pub_bytes: bytes, creation_time: int) -> bytes:
 
 
 def pgp_fingerprint(key_body: bytes) -> bytes:
-    return hashlib.sha1(bytes([0x99]) + struct.pack(">H", len(key_body)) + key_body).digest()
+    # SHA1 is mandated by OpenPGP RFC 4880 §12.2 for V4 key fingerprints — not a security weakness here
+    return hashlib.sha1(bytes([0x99]) + struct.pack(">H", len(key_body)) + key_body).digest()  # nosec B324
 
 
 def pgp_seckey_body(pub_body: bytes, priv_seed: bytes) -> bytes:
