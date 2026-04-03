@@ -1,5 +1,6 @@
 ---
 name: agent-id-io
+version: "1.0.0"
 description: >
   Register, authenticate, and manage AI agent identities on agent-id.io —
   the decentralized identity layer for AI agents. Use when an AI agent needs

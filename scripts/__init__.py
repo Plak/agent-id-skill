@@ -1,1 +1,1 @@
-# Allow importing scripts as a package for tests
+# Test import bridge only - not a Python package

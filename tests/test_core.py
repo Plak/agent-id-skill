@@ -6,30 +6,14 @@ import base64
 import hashlib
 import json
 import os
-import sys
 
 import pytest
-
-# Add scripts/ to import path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
 
 from scripts.register import generate_keypair, solve_pow
 from scripts.secure_keyfile import encrypt_keyfile, decrypt_keyfile
-
-
-def _make_keys_file(tmp_path):
-    """Helper: generate a valid agent_keys.json in tmp_path, return path."""
-    keys = generate_keypair()
-    keys["agent_id"] = "00000000-0000-0000-0000-000000000001"
-    keys["display_name"] = "test-agent"
-    keys["warning"] = "test"
-    path = str(tmp_path / "agent_keys.json")
-    with open(path, "w") as f:
-        json.dump(keys, f)
-    return path, keys
 
 
 # ---------- Test 1: Keygen ----------
@@ -86,13 +70,13 @@ def test_sign_challenge_produces_valid_signature():
 
 # ---------- Test 3: Encrypt/Decrypt roundtrip ----------
 
-def test_secure_keyfile_encrypt_decrypt_roundtrip(tmp_path):
+def test_secure_keyfile_encrypt_decrypt_roundtrip(tmp_path, tmp_keys, fast_scrypt):
     """Encrypt agent_keys.json, decrypt with same passphrase, verify identical content."""
-    keys_path, keys = _make_keys_file(tmp_path)
+    keys_path, keys = tmp_keys
     enc_path = str(tmp_path / "agent_keys.json.enc")
     passphrase = "test-passphrase-7291"
 
-    encrypt_keyfile(keys_path, enc_path, passphrase)
+    encrypt_keyfile(keys_path, enc_path, passphrase, scrypt_n=fast_scrypt)
 
     # Encrypted file must exist and differ from plaintext
     assert os.path.exists(enc_path)
@@ -101,7 +85,7 @@ def test_secure_keyfile_encrypt_decrypt_roundtrip(tmp_path):
     assert enc_data[:9] == b"AGENTKEY1"  # magic header
 
     # Decrypt and compare
-    decrypted = decrypt_keyfile(enc_path, passphrase)
+    decrypted = decrypt_keyfile(enc_path, passphrase, scrypt_n=fast_scrypt)
     decrypted_keys = json.loads(decrypted)
     assert decrypted_keys["sign_private_key"] == keys["sign_private_key"]
     assert decrypted_keys["sign_public_key"] == keys["sign_public_key"]
@@ -110,15 +94,15 @@ def test_secure_keyfile_encrypt_decrypt_roundtrip(tmp_path):
 
 # ---------- Test 4: Wrong passphrase fails ----------
 
-def test_secure_keyfile_wrong_passphrase_fails(tmp_path):
+def test_secure_keyfile_wrong_passphrase_fails(tmp_path, tmp_keys, fast_scrypt):
     """Decrypting with wrong passphrase must raise SystemExit (via sys.exit)."""
-    keys_path, _ = _make_keys_file(tmp_path)
+    keys_path, _ = tmp_keys
     enc_path = str(tmp_path / "agent_keys.json.enc")
 
-    encrypt_keyfile(keys_path, enc_path, "correct-passphrase")
+    encrypt_keyfile(keys_path, enc_path, "correct-passphrase", scrypt_n=fast_scrypt)
 
     with pytest.raises(SystemExit):
-        decrypt_keyfile(enc_path, "wrong-passphrase")
+        decrypt_keyfile(enc_path, "wrong-passphrase", scrypt_n=fast_scrypt)
 
 
 # ---------- Test 5: Deterministic key derivation ----------

@@ -42,12 +42,17 @@ SCRYPT_R = 8
 SCRYPT_P = 1
 
 
-def derive_key(passphrase: str, salt: bytes) -> bytes:
-    kdf = Scrypt(salt=salt, length=32, n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P)
+def derive_key(passphrase: str, salt: bytes, scrypt_n: int = SCRYPT_N) -> bytes:
+    kdf = Scrypt(salt=salt, length=32, n=scrypt_n, r=SCRYPT_R, p=SCRYPT_P)
     return kdf.derive(passphrase.encode())
 
 
-def encrypt_keyfile(plaintext_path: str, output_path: str, passphrase: str) -> None:
+def encrypt_keyfile(
+    plaintext_path: str,
+    output_path: str,
+    passphrase: str,
+    scrypt_n: int = SCRYPT_N,
+) -> None:
     with open(plaintext_path, "rb") as f:
         plaintext = f.read()
 
@@ -62,7 +67,7 @@ def encrypt_keyfile(plaintext_path: str, output_path: str, passphrase: str) -> N
 
     salt = os.urandom(32)
     nonce = os.urandom(12)
-    key = derive_key(passphrase, salt)
+    key = derive_key(passphrase, salt, scrypt_n=scrypt_n)
 
     aesgcm = AESGCM(key)
     ciphertext = aesgcm.encrypt(nonce, plaintext, None)
@@ -76,7 +81,11 @@ def encrypt_keyfile(plaintext_path: str, output_path: str, passphrase: str) -> N
     os.chmod(output_path, 0o600)
 
 
-def decrypt_keyfile(encrypted_path: str, passphrase: str) -> bytes:
+def decrypt_keyfile(
+    encrypted_path: str,
+    passphrase: str,
+    scrypt_n: int = SCRYPT_N,
+) -> bytes:
     with open(encrypted_path, "rb") as f:
         data = f.read()
 
@@ -89,7 +98,7 @@ def decrypt_keyfile(encrypted_path: str, passphrase: str) -> bytes:
     nonce = data[offset + 32:offset + 44]
     ciphertext = data[offset + 44:]
 
-    key = derive_key(passphrase, salt)
+    key = derive_key(passphrase, salt, scrypt_n=scrypt_n)
     aesgcm = AESGCM(key)
     try:
         plaintext = aesgcm.decrypt(nonce, ciphertext, None)
