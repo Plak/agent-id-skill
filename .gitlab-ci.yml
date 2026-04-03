@@ -1,0 +1,28 @@
+stages:
+  - lint
+  - security
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.pip-cache"
+
+cache:
+  paths:
+    - .pip-cache/
+
+python-lint:
+  stage: lint
+  image: python:3.12-slim
+  before_script:
+    - pip install pylint --quiet
+  script:
+    - find scripts/ -name "*.py" -exec pylint --disable=C0114,C0115,C0116,R0903 {} + || true
+  allow_failure: true
+
+python-security:
+  stage: security
+  image: python:3.12-slim
+  before_script:
+    - pip install bandit --quiet
+  script:
+    - find scripts/ -name "*.py" | xargs bandit -ll -q || true
+  allow_failure: true
