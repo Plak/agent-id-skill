@@ -34,6 +34,11 @@ import time
 from datetime import datetime, timezone
 
 try:
+    from .crypto_utils import secure_zero, to_secure_buffer
+except ImportError:
+    from crypto_utils import secure_zero, to_secure_buffer
+
+try:
     from cryptography.hazmat.primitives.kdf.hkdf import HKDF
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -235,38 +240,47 @@ def main():
     uid = args.uid or f"{agent_id} <{agent_id}@agent-id.io>"
     comment = args.comment or f"{agent_id}@agent-id.io"
 
-    priv_bytes = base64.b64decode(keys["sign_private_key"])
-    assert len(priv_bytes) == 32, f"Expected 32-byte seed, got {len(priv_bytes)}"
+    priv_buf = to_secure_buffer(base64.b64decode(keys["sign_private_key"]))
+    ssh_seed = bytearray()
+    pgp_seed = bytearray()
+    try:
+        assert len(priv_buf) == 32, f"Expected 32-byte seed, got {len(priv_buf)}"
 
-    os.makedirs(args.out_dir, exist_ok=True)
+        os.makedirs(args.out_dir, exist_ok=True)
 
-    print(f"Agent: {agent_id}")
-    print(f"Output: {args.out_dir}")
-    print()
+        print(f"Agent: {agent_id}")
+        print(f"Output: {args.out_dir}")
+        print()
 
-    # SSH
-    ssh_seed = derive_child_seed(priv_bytes, "agent-id/ssh-ed25519")
-    priv_path, pub_path = write_ssh_keys(ssh_seed, args.out_dir, comment)
-    ssh_pub = open(pub_path).read().strip()
-    print(f"✅ SSH private key → {priv_path}")
-    print(f"✅ SSH public key  → {pub_path}")
-    print(f"   {ssh_pub}")
-    print()
+        # Best-effort only: Python/C extensions may retain derived-key copies internally.
+        ssh_seed = to_secure_buffer(derive_child_seed(bytes(priv_buf), "agent-id/ssh-ed25519"))
+        priv_path, pub_path = write_ssh_keys(bytes(ssh_seed), args.out_dir, comment)
+        with open(pub_path) as handle:
+            ssh_pub = handle.read().strip()
+        print(f"✅ SSH private key → {priv_path}")
+        print(f"✅ SSH public key  → {pub_path}")
+        print(f"   {ssh_pub}")
+        print()
 
-    # PGP
-    pgp_seed = derive_child_seed(priv_bytes, "agent-id/pgp-ed25519")
-    priv_path, pub_path, fp = write_pgp_keys(pgp_seed, args.out_dir, uid)
-    key_id = fp[-16:]
-    print(f"✅ PGP private key → {priv_path}")
-    print(f"✅ PGP public key  → {pub_path}")
-    print(f"   Fingerprint: {fp}")
-    print(f"   Key ID: {key_id}")
-    print(f"   UID: {uid}")
-    print(f"   Import: gpg --import {pub_path}")
-    print()
+        pgp_seed = to_secure_buffer(derive_child_seed(bytes(priv_buf), "agent-id/pgp-ed25519"))
+        priv_path, pub_path, fp = write_pgp_keys(bytes(pgp_seed), args.out_dir, uid)
+        key_id = fp[-16:]
+        print(f"✅ PGP private key → {priv_path}")
+        print(f"✅ PGP public key  → {pub_path}")
+        print(f"   Fingerprint: {fp}")
+        print(f"   Key ID: {key_id}")
+        print(f"   UID: {uid}")
+        print(f"   Import: gpg --import {pub_path}")
+        print()
 
-    print("ℹ️  Keys are DETERMINISTIC — regenerate anytime from agent_keys.json")
-    print("   Keep agent_keys.json encrypted: python3 scripts/secure_keyfile.py encrypt agent_keys.json")
+        print("ℹ️  Keys are DETERMINISTIC — regenerate anytime from agent_keys.json")
+        print("   Keep agent_keys.json encrypted: python3 scripts/secure_keyfile.py encrypt agent_keys.json")
+    finally:
+        secure_zero(priv_buf)
+        if ssh_seed:
+            secure_zero(ssh_seed)
+        if pgp_seed:
+            secure_zero(pgp_seed)
 
 
 if __name__ == "__main__":
