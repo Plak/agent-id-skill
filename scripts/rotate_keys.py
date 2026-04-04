@@ -70,6 +70,10 @@ def main():
         "enc_private_key": base64.b64encode(new_enc_priv_bytes).decode(),
         "enc_public_key": base64.b64encode(new_enc_pub_bytes).decode(),
     }
+    if "agent_id" in old_keys:
+        new_keys["agent_id"] = old_keys["agent_id"]
+    if "display_name" in old_keys:
+        new_keys["display_name"] = old_keys["display_name"]
     with open(args.new_keys, "w") as f:
         json.dump(new_keys, f, indent=2)
     os.chmod(args.new_keys, 0o600)

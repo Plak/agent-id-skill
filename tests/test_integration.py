@@ -2,6 +2,7 @@
 import base64
 import hashlib
 import json
+import stat
 import sys
 from pathlib import Path
 
@@ -15,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.authenticate import ORIGIN, RP_ID, b64url_encode
 from scripts.register import API_BASE, generate_keypair, solve_pow
+from scripts import authenticate, rotate_keys
 
 
 @responses.activate
@@ -127,3 +129,89 @@ def test_register_rate_limit_handling():
 
     assert response.status_code == 429
     assert response.headers["Retry-After"] == "60"
+
+
+@responses.activate
+def test_authenticate_save_token_uses_mode_0600(tmp_path, tmp_keys, monkeypatch):
+    """Saved token files must be created without group/other read bits."""
+    keys_path, _ = tmp_keys
+    token_path = tmp_path / "token.txt"
+
+    responses.post(
+        f"{authenticate.API_BASE}/auth/challenge",
+        json={"challenge": "test-challenge"},
+        status=200,
+    )
+    responses.post(
+        f"{authenticate.API_BASE}/auth/verify",
+        json={"token": "secret-jwt", "expires_at": "2099-01-01T00:00:00Z"},
+        status=200,
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["authenticate.py", keys_path, "--save-token", str(token_path)],
+    )
+
+    authenticate.main()
+
+    mode = stat.S_IMODE(token_path.stat().st_mode)
+    assert mode == 0o600
+    assert mode & (stat.S_IRGRP | stat.S_IROTH) == 0
+    assert token_path.read_text() == "secret-jwt"
+
+
+def test_rotate_keys_carries_agent_metadata(tmp_path, tmp_keys, monkeypatch):
+    """Rotation output should preserve agent_id and display_name metadata."""
+    keys_path, keys = tmp_keys
+    new_keys_path = tmp_path / "new_agent_keys.json"
+    payload_path = tmp_path / "rotation_payload.json"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "rotate_keys.py",
+            keys_path,
+            "--new-keys",
+            str(new_keys_path),
+            "--payload",
+            str(payload_path),
+        ],
+    )
+
+    rotate_keys.main()
+
+    new_keys = json.loads(new_keys_path.read_text())
+    assert new_keys["agent_id"] == keys["agent_id"]
+    assert new_keys["display_name"] == keys["display_name"]
+
+
+def test_rotate_keys_keeps_display_name_optional(tmp_path, tmp_keys, monkeypatch):
+    """Rotation should copy agent_id and omit display_name when it was absent."""
+    keys_path, keys = tmp_keys
+    del keys["display_name"]
+    Path(keys_path).write_text(json.dumps(keys))
+
+    new_keys_path = tmp_path / "new_agent_keys.json"
+    payload_path = tmp_path / "rotation_payload.json"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "rotate_keys.py",
+            keys_path,
+            "--new-keys",
+            str(new_keys_path),
+            "--payload",
+            str(payload_path),
+        ],
+    )
+
+    rotate_keys.main()
+
+    new_keys = json.loads(new_keys_path.read_text())
+    assert new_keys["agent_id"] == keys["agent_id"]
+    assert "display_name" not in new_keys
