@@ -22,6 +22,11 @@ import os
 import sys
 
 try:
+    from .crypto_utils import write_secret_file
+except ImportError:
+    from crypto_utils import write_secret_file
+
+try:
     import requests
 except ImportError:
     print("Error: 'requests' required. Run: pip install requests", file=sys.stderr)
@@ -115,8 +120,7 @@ def main():
     expires_at = result["expires_at"]
 
     if args.save_token:
-        with open(args.save_token, "w") as f:
-            f.write(token)
+        write_secret_file(args.save_token, token)
         print(f"✅ Token saved to {args.save_token} (expires {expires_at})", file=sys.stderr)
     else:
         print(token)

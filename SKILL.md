@@ -245,17 +245,23 @@ Keys are deterministic: the same `agent_keys.json` always produces the same SSH 
 
 The agent is responsible for keeping the master keyfile secure. Treat `agent_keys.json` like a private key — it IS one.
 
+Security warning: inline environment variable assignments like `AGENT_KEY_PASSPHRASE=... python3 ...` are less safe. They can be exposed through `/proc/<pid>/environ`, shell history, process logging, or terminal scrollback.
+
 **Encrypt the keyfile (AES-256-GCM + scrypt):**
 ```bash
-# Encrypt (passphrase from env var or prompt)
-AGENT_KEY_PASSPHRASE="<strong-passphrase>" python3 scripts/secure_keyfile.py encrypt agent_keys.json
+# Encrypt (preferred: interactive prompt, avoids exposing the passphrase inline)
+python3 scripts/secure_keyfile.py encrypt agent_keys.json
 # → creates agent_keys.json.enc
 rm agent_keys.json  # delete plaintext
 
-# Decrypt on use (to memory/temp)
-AGENT_KEY_PASSPHRASE="..." python3 scripts/secure_keyfile.py decrypt agent_keys.json.enc --out /tmp/keys.json
+# Decrypt on use (preferred: interactive prompt)
+python3 scripts/secure_keyfile.py decrypt agent_keys.json.enc --out /tmp/keys.json
 python3 scripts/authenticate.py /tmp/keys.json
 rm /tmp/keys.json  # delete immediately after use
+
+# Less safe fallback: passphrase via environment variable
+AGENT_KEY_PASSPHRASE="<strong-passphrase>" python3 scripts/secure_keyfile.py encrypt agent_keys.json
+AGENT_KEY_PASSPHRASE="<strong-passphrase>" python3 scripts/secure_keyfile.py decrypt agent_keys.json.enc --out /tmp/keys.json
 ```
 
 **Where the passphrase lives:**
