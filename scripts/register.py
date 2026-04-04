@@ -24,11 +24,11 @@ import sys
 import time
 
 try:
-    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer
+    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer, resolve_api_base
     from .keygen import resolve_output_path
     from .secure_keyfile import encrypt_key_material, resolve_passphrase
 except ImportError:
-    from crypto_utils import atomic_write, secure_zero, to_secure_buffer
+    from crypto_utils import atomic_write, secure_zero, to_secure_buffer, resolve_api_base
     from keygen import resolve_output_path
     from secure_keyfile import encrypt_key_material, resolve_passphrase
 
@@ -46,7 +46,7 @@ except ImportError:
     print("Error: 'cryptography' required. Run: pip install cryptography", file=sys.stderr)
     sys.exit(1)
 
-API_BASE = "https://agent-id.io/v1"
+API_BASE = resolve_api_base()
 
 
 def generate_keypair():

@@ -185,3 +185,69 @@ def test_pow_solver():
             break
 
     assert zero_bits >= difficulty, f"Expected >= {difficulty} leading zero bits, got {zero_bits}"
+
+
+# ---------- Test: validate_challenge ----------
+
+def test_validate_challenge_accepts_valid_base64url():
+    from scripts.crypto_utils import validate_challenge
+    # 32 bytes encoded as base64url (no padding)
+    validate_challenge("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+
+
+def test_validate_challenge_rejects_non_base64():
+    import pytest
+    from scripts.crypto_utils import validate_challenge
+    with pytest.raises(SystemExit):
+        validate_challenge("!!!not base64!!!")
+
+
+def test_validate_challenge_rejects_too_short():
+    import pytest
+    import base64
+    from scripts.crypto_utils import validate_challenge
+    short = base64.urlsafe_b64encode(b"\x00" * 8).decode().rstrip("=")
+    with pytest.raises(SystemExit):
+        validate_challenge(short)
+
+
+def test_validate_challenge_rejects_too_long():
+    import pytest
+    import base64
+    from scripts.crypto_utils import validate_challenge
+    long_data = base64.urlsafe_b64encode(b"\x00" * 200).decode().rstrip("=")
+    with pytest.raises(SystemExit):
+        validate_challenge(long_data)
+
+
+# ---------- Test: resolve_api_base ----------
+
+def test_resolve_api_base_default(monkeypatch):
+    monkeypatch.delenv("AGENT_ID_API", raising=False)
+    from scripts.crypto_utils import resolve_api_base
+    assert resolve_api_base() == "https://agent-id.io/v1"
+
+
+def test_resolve_api_base_valid_https(monkeypatch):
+    monkeypatch.setenv("AGENT_ID_API", "https://test.example.com/v1")
+    from scripts import crypto_utils
+    import importlib
+    importlib.reload(crypto_utils)  # reload to pick up env
+    # Direct call is cleaner
+    from scripts.crypto_utils import resolve_api_base
+    assert resolve_api_base() == "https://test.example.com/v1"
+
+
+def test_resolve_api_base_rejects_http(monkeypatch):
+    import pytest
+    monkeypatch.setenv("AGENT_ID_API", "http://evil.example.com/v1")
+    from scripts.crypto_utils import resolve_api_base
+    with pytest.raises(SystemExit):
+        resolve_api_base()
+
+
+def test_resolve_api_base_strips_trailing_slash(monkeypatch):
+    monkeypatch.delenv("AGENT_ID_API", raising=False)
+    from scripts.crypto_utils import resolve_api_base
+    result = resolve_api_base("https://agent-id.io/v1/")
+    assert result == "https://agent-id.io/v1"

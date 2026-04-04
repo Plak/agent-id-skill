@@ -21,9 +21,9 @@ import json
 import sys
 
 try:
-    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer
+    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer, validate_challenge
 except ImportError:
-    from crypto_utils import atomic_write, secure_zero, to_secure_buffer
+    from crypto_utils import atomic_write, secure_zero, to_secure_buffer, validate_challenge
 
 try:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -47,6 +47,7 @@ def main():
     parser.add_argument("--agent-id", help="Agent UUID (or read from keys_file)")
     parser.add_argument("--output", help="Output file (default: stdout)")
     args = parser.parse_args()
+    validate_challenge(args.challenge)
 
     with open(args.keys_file) as f:
         keys = json.load(f)
