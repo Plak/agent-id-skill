@@ -22,9 +22,9 @@ import os
 import sys
 
 try:
-    from .crypto_utils import secure_zero, to_secure_buffer, write_secret_file
+    from .crypto_utils import secure_zero, to_secure_buffer, write_secret_file, validate_challenge, resolve_api_base
 except ImportError:
-    from crypto_utils import secure_zero, to_secure_buffer, write_secret_file
+    from crypto_utils import secure_zero, to_secure_buffer, write_secret_file, validate_challenge, resolve_api_base
 
 try:
     import requests
@@ -39,7 +39,7 @@ except ImportError:
     print("Error: 'cryptography' required. Run: pip install cryptography", file=sys.stderr)
     sys.exit(1)
 
-API_BASE = os.environ.get("AGENT_ID_API", "https://agent-id.io/v1")
+API_BASE = resolve_api_base()
 RP_ID = "agent-id.io"
 ORIGIN = "https://agent-id.io"
 
@@ -81,6 +81,7 @@ def main():
             sys.exit(1)
         resp.raise_for_status()
         challenge = resp.json()["challenge"]
+        validate_challenge(challenge)
 
         # Build authenticatorData (rpIdHash + UP flag + sign_count)
         rp_id_hash = hashlib.sha256(RP_ID.encode()).digest()

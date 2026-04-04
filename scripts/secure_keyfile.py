@@ -91,8 +91,13 @@ def encrypt_keyfile(
     scrypt_n: int = SCRYPT_N,
 ) -> None:
     with open(plaintext_path, "rb") as f:
-        plaintext = f.read()
-    encrypt_key_material(plaintext, output_path, passphrase, scrypt_n=scrypt_n)
+        raw = f.read()
+    # Use secure buffer so the plaintext is zeroable after use
+    plaintext_buf = to_secure_buffer(raw)
+    try:
+        encrypt_key_material(bytes(plaintext_buf), output_path, passphrase, scrypt_n=scrypt_n)
+    finally:
+        secure_zero(plaintext_buf)
 
 
 def decrypt_keyfile(
@@ -127,10 +132,22 @@ def decrypt_keyfile(
 
 
 def resolve_passphrase(explicit_passphrase: str | None) -> str:
-    """Resolve the encryption passphrase from CLI, env, or prompt."""
+    """Resolve the encryption passphrase from CLI, env, or prompt.
+
+    Warns when passphrase is supplied via CLI argument: it is visible in
+    process listings (ps aux, /proc/<pid>/cmdline) on multi-user systems.
+    Prefer AGENT_KEY_PASSPHRASE env var or the interactive prompt.
+    """
+    import sys  # local import to keep module-level clean
+    if explicit_passphrase is not None:
+        print(
+            "Warning: --passphrase is visible in process listings (ps aux / /proc/*/cmdline). "
+            "Prefer AGENT_KEY_PASSPHRASE env var or omit --passphrase for an interactive prompt.",
+            file=sys.stderr,
+        )
+        return explicit_passphrase
     return (
-        explicit_passphrase
-        or os.environ.get("AGENT_KEY_PASSPHRASE")
+        os.environ.get("AGENT_KEY_PASSPHRASE")
         or getpass.getpass("Passphrase: ")
     )
 

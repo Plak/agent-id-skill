@@ -93,7 +93,7 @@ def test_authenticate_challenge_signing():
     client_data = json.dumps(
         {
             "type": "webauthn.get",
-            "challenge": "test-challenge",
+            "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
             "origin": ORIGIN,
         },
         separators=(",", ":"),
@@ -139,7 +139,7 @@ def test_authenticate_save_token_uses_mode_0600(tmp_path, tmp_keys, monkeypatch)
 
     responses.post(
         f"{authenticate.API_BASE}/auth/challenge",
-        json={"challenge": "test-challenge"},
+        json={"challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
         status=200,
     )
     responses.post(
@@ -427,7 +427,7 @@ def test_authenticate_zeroes_private_key_buffer(tmp_path, tmp_keys, monkeypatch)
 
     responses.post(
         f"{authenticate.API_BASE}/auth/challenge",
-        json={"challenge": "test-challenge"},
+        json={"challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
         status=200,
     )
     responses.post(

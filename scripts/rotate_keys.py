@@ -29,9 +29,9 @@ except ImportError:
     sys.exit(1)
 
 try:
-    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer
+    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer, resolve_api_base
 except ImportError:
-    from crypto_utils import atomic_write, secure_zero, to_secure_buffer
+    from crypto_utils import atomic_write, secure_zero, to_secure_buffer, resolve_api_base
 
 try:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -41,7 +41,7 @@ except ImportError:
     print("Error: 'cryptography' package required. Run: pip install cryptography", file=sys.stderr)
     sys.exit(1)
 
-API_BASE = os.environ.get("AGENT_ID_API", "https://agent-id.io/v1")
+API_BASE = resolve_api_base()
 
 
 def build_rotation_material(old_keys: dict) -> tuple[dict, dict]:

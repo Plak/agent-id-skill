@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Utilities for handling secret material with restrictive permissions."""
 
+import base64
 import os
+import sys
 import tempfile
 
 
@@ -52,3 +54,49 @@ def atomic_write(path: str, content: bytes | str, mode: int = 0o600) -> None:
 def write_secret_file(path: str, content: str | bytes, mode: int = 0o600) -> None:
     """Write secret content to a file with restrictive permissions."""
     atomic_write(path, content, mode=mode)
+
+
+def validate_challenge(challenge: str) -> None:
+    """Validate that challenge is a well-formed base64url-encoded value.
+
+    Accepts standard base64url with or without padding.
+    Decoded length must be 16–128 bytes.
+
+    Raises SystemExit with a descriptive error on failure.
+    """
+    try:
+        # Add padding if missing
+        padded = challenge + "=" * (-len(challenge) % 4)
+        decoded = base64.urlsafe_b64decode(padded)
+    except Exception:
+        print(f"Error: challenge is not valid base64url: {challenge!r}", file=sys.stderr)
+        sys.exit(1)
+    if len(decoded) < 16:
+        print(
+            f"Error: challenge too short ({len(decoded)} bytes decoded, minimum 16)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if len(decoded) > 128:
+        print(
+            f"Error: challenge too long ({len(decoded)} bytes decoded, maximum 128)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+def resolve_api_base(default: str = "https://agent-id.io/v1") -> str:
+    """Resolve the API base URL, enforcing HTTPS.
+
+    Reads AGENT_ID_API environment variable. Rejects non-HTTPS URLs with
+    a clear error message to prevent TLS downgrade attacks.
+    """
+    url = os.environ.get("AGENT_ID_API", default).rstrip("/")
+    if not url.startswith("https://"):
+        print(
+            f"Error: AGENT_ID_API must use https:// (got {url!r}). "
+            "HTTP connections expose credentials in transit.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return url
