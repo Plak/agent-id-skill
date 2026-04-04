@@ -21,6 +21,11 @@ import json
 import sys
 
 try:
+    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer
+except ImportError:
+    from crypto_utils import atomic_write, secure_zero, to_secure_buffer
+
+try:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
 except ImportError:
@@ -46,44 +51,50 @@ def main():
     with open(args.keys_file) as f:
         keys = json.load(f)
 
-    priv_bytes = base64.b64decode(keys["sign_private_key"])
-    private_key = Ed25519PrivateKey.from_private_bytes(priv_bytes)
-    pub_bytes = private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
-    credential_id = b64url_encode(pub_bytes)
+    private_key = None
+    priv_buf = to_secure_buffer(base64.b64decode(keys["sign_private_key"]))
+    try:
+        # Best-effort only: Python/C extensions may retain private key copies internally.
+        private_key = Ed25519PrivateKey.from_private_bytes(bytes(priv_buf))
+        pub_bytes = private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+        credential_id = b64url_encode(pub_bytes)
 
-    # Build authenticatorData
-    rp_id_hash = hashlib.sha256(RP_ID.encode()).digest()
-    flags = bytes([0x01])
-    sign_count = (0).to_bytes(4, "big")
-    authenticator_data = rp_id_hash + flags + sign_count
+        # Build authenticatorData
+        rp_id_hash = hashlib.sha256(RP_ID.encode()).digest()
+        flags = bytes([0x01])
+        sign_count = (0).to_bytes(4, "big")
+        authenticator_data = rp_id_hash + flags + sign_count
 
-    # Build clientDataJSON
-    client_data = json.dumps({
-        "type": "webauthn.get",
-        "challenge": args.challenge,
-        "origin": ORIGIN,
-    }, separators=(",", ":")).encode()
+        # Build clientDataJSON
+        client_data = json.dumps({
+            "type": "webauthn.get",
+            "challenge": args.challenge,
+            "origin": ORIGIN,
+        }, separators=(",", ":")).encode()
 
-    # Sign authenticatorData + SHA256(clientDataJSON)
-    client_data_hash = hashlib.sha256(client_data).digest()
-    signed_data = authenticator_data + client_data_hash
-    signature = private_key.sign(signed_data)
+        # Sign authenticatorData + SHA256(clientDataJSON)
+        client_data_hash = hashlib.sha256(client_data).digest()
+        signed_data = authenticator_data + client_data_hash
+        signature = private_key.sign(signed_data)
 
-    payload = {
-        "agent_id": args.agent_id or keys.get("agent_id", "<your-agent-id-uuid>"),
-        "credential_id": credential_id,
-        "authenticator_data": b64url_encode(authenticator_data),
-        "client_data_json": b64url_encode(client_data),
-        "signature": b64url_encode(signature),
-    }
+        payload = {
+            "agent_id": args.agent_id or keys.get("agent_id", "<your-agent-id-uuid>"),
+            "credential_id": credential_id,
+            "authenticator_data": b64url_encode(authenticator_data),
+            "client_data_json": b64url_encode(client_data),
+            "signature": b64url_encode(signature),
+        }
 
-    output = json.dumps(payload, indent=2)
-    if args.output:
-        with open(args.output, "w") as f:
-            f.write(output)
-        print(f"✅ Signed payload written to {args.output}", file=sys.stderr)
-    else:
-        print(output)
+        output = json.dumps(payload, indent=2)
+        if args.output:
+            atomic_write(args.output, output, mode=0o600)
+            print(f"✅ Signed payload written to {args.output}", file=sys.stderr)
+        else:
+            print(output)
+    finally:
+        secure_zero(priv_buf)
+        if private_key is not None:
+            del private_key
 
 
 if __name__ == "__main__":

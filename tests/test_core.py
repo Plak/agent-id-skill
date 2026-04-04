@@ -12,6 +12,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
 
+from scripts.crypto_utils import atomic_write, secure_zero, to_secure_buffer
 from scripts.register import generate_keypair, solve_pow
 from scripts.secure_keyfile import encrypt_keyfile, decrypt_keyfile
 
@@ -103,6 +104,34 @@ def test_secure_keyfile_wrong_passphrase_fails(tmp_path, tmp_keys, fast_scrypt):
 
     with pytest.raises(SystemExit):
         decrypt_keyfile(enc_path, "wrong-passphrase", scrypt_n=fast_scrypt)
+
+
+def test_secure_zero_and_to_secure_buffer():
+    """Secure buffers should be mutable and zeroable for best-effort cleanup."""
+    from_bytes = to_secure_buffer(b"secret")
+    from_text = to_secure_buffer("secret")
+
+    assert isinstance(from_bytes, bytearray)
+    assert isinstance(from_text, bytearray)
+    assert bytes(from_bytes) == b"secret"
+    assert bytes(from_text) == b"secret"
+
+    secure_zero(from_bytes)
+    secure_zero(from_text)
+
+    assert bytes(from_bytes) == b"\x00" * 6
+    assert bytes(from_text) == b"\x00" * 6
+
+
+def test_atomic_write_replaces_existing_file(tmp_path):
+    """atomic_write should replace the destination content and keep restrictive mode."""
+    target = tmp_path / "secret.txt"
+    target.write_text("old")
+
+    atomic_write(str(target), "new-secret", mode=0o600)
+
+    assert target.read_text() == "new-secret"
+    assert os.stat(target).st_mode & 0o777 == 0o600
 
 
 # ---------- Test 5: Deterministic key derivation ----------

@@ -16,6 +16,11 @@ import json
 import sys
 
 try:
+    from .crypto_utils import secure_zero, to_secure_buffer
+except ImportError:
+    from crypto_utils import secure_zero, to_secure_buffer
+
+try:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 except ImportError:
     print("Error: 'cryptography' package required. Run: pip install cryptography", file=sys.stderr)
@@ -31,16 +36,23 @@ def main():
     with open(args.sponsor_keys_file) as f:
         keys = json.load(f)
 
-    priv_bytes = base64.b64decode(keys["sign_private_key"])
-    private_key = Ed25519PrivateKey.from_private_bytes(priv_bytes)
+    private_key = None
+    priv_buf = to_secure_buffer(base64.b64decode(keys["sign_private_key"]))
+    try:
+        # Best-effort only: Python/C extensions may retain private key copies internally.
+        private_key = Ed25519PrivateKey.from_private_bytes(bytes(priv_buf))
 
-    requester_pub_bytes = base64.b64decode(args.requester_public_sign_key)
-    signature = private_key.sign(requester_pub_bytes)
+        requester_pub_bytes = base64.b64decode(args.requester_public_sign_key)
+        signature = private_key.sign(requester_pub_bytes)
 
-    payload = {
-        "sponsor_signature": base64.b64encode(signature).decode()
-    }
-    print(json.dumps(payload, indent=2))
+        payload = {
+            "sponsor_signature": base64.b64encode(signature).decode()
+        }
+        print(json.dumps(payload, indent=2))
+    finally:
+        secure_zero(priv_buf)
+        if private_key is not None:
+            del private_key
 
 
 if __name__ == "__main__":

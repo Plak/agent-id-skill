@@ -29,6 +29,11 @@ import os
 import sys
 
 try:
+    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer
+except ImportError:
+    from crypto_utils import atomic_write, secure_zero, to_secure_buffer
+
+try:
     from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     from cryptography.exceptions import InvalidTag
@@ -47,6 +52,38 @@ def derive_key(passphrase: str, salt: bytes, scrypt_n: int = SCRYPT_N) -> bytes:
     return kdf.derive(passphrase.encode())
 
 
+def encrypt_key_material(
+    plaintext: bytes | str,
+    output_path: str,
+    passphrase: str,
+    scrypt_n: int = SCRYPT_N,
+) -> None:
+    """Encrypt key material from memory without persisting plaintext to disk."""
+    plaintext_buf = to_secure_buffer(plaintext)
+    key_buf = bytearray()
+    try:
+        # Best-effort only: Python and C extensions may retain copies on the C heap.
+        try:
+            keys = json.loads(bytes(plaintext_buf))
+            if "sign_private_key" not in keys:
+                print("Warning: file doesn't look like an agent_keys.json", file=sys.stderr)
+        except json.JSONDecodeError:
+            print("Error: not valid JSON", file=sys.stderr)
+            sys.exit(1)
+
+        salt = os.urandom(32)
+        nonce = os.urandom(12)
+        key_buf = to_secure_buffer(derive_key(passphrase, salt, scrypt_n=scrypt_n))
+
+        aesgcm = AESGCM(bytes(key_buf))
+        ciphertext = MAGIC + salt + nonce + aesgcm.encrypt(nonce, bytes(plaintext_buf), None)
+        atomic_write(output_path, ciphertext, mode=0o600)
+    finally:
+        secure_zero(plaintext_buf)
+        if key_buf:
+            secure_zero(key_buf)
+
+
 def encrypt_keyfile(
     plaintext_path: str,
     output_path: str,
@@ -55,30 +92,7 @@ def encrypt_keyfile(
 ) -> None:
     with open(plaintext_path, "rb") as f:
         plaintext = f.read()
-
-    # Validate it's a valid JSON keys file
-    try:
-        keys = json.loads(plaintext)
-        if "sign_private_key" not in keys:
-            print("Warning: file doesn't look like an agent_keys.json", file=sys.stderr)
-    except json.JSONDecodeError:
-        print("Error: not valid JSON", file=sys.stderr)
-        sys.exit(1)
-
-    salt = os.urandom(32)
-    nonce = os.urandom(12)
-    key = derive_key(passphrase, salt, scrypt_n=scrypt_n)
-
-    aesgcm = AESGCM(key)
-    ciphertext = aesgcm.encrypt(nonce, plaintext, None)
-
-    # Format: MAGIC + salt(32) + nonce(12) + ciphertext
-    with open(output_path, "wb") as f:
-        f.write(MAGIC)
-        f.write(salt)
-        f.write(nonce)
-        f.write(ciphertext)
-    os.chmod(output_path, 0o600)
+    encrypt_key_material(plaintext, output_path, passphrase, scrypt_n=scrypt_n)
 
 
 def decrypt_keyfile(
@@ -98,14 +112,27 @@ def decrypt_keyfile(
     nonce = data[offset + 32:offset + 44]
     ciphertext = data[offset + 44:]
 
-    key = derive_key(passphrase, salt, scrypt_n=scrypt_n)
-    aesgcm = AESGCM(key)
+    key_buf = to_secure_buffer(derive_key(passphrase, salt, scrypt_n=scrypt_n))
     try:
-        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
-    except InvalidTag:
-        print("Error: wrong passphrase or corrupted file", file=sys.stderr)
-        sys.exit(1)
-    return plaintext
+        # Best-effort only: decrypt() and the crypto backend may keep internal copies.
+        aesgcm = AESGCM(bytes(key_buf))
+        try:
+            plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+        except InvalidTag:
+            print("Error: wrong passphrase or corrupted file", file=sys.stderr)
+            sys.exit(1)
+        return plaintext
+    finally:
+        secure_zero(key_buf)
+
+
+def resolve_passphrase(explicit_passphrase: str | None) -> str:
+    """Resolve the encryption passphrase from CLI, env, or prompt."""
+    return (
+        explicit_passphrase
+        or os.environ.get("AGENT_KEY_PASSPHRASE")
+        or getpass.getpass("Passphrase: ")
+    )
 
 
 def main():
@@ -129,11 +156,7 @@ def main():
         sys.exit(1)
 
     # Get passphrase
-    passphrase = (
-        args.passphrase
-        or os.environ.get("AGENT_KEY_PASSPHRASE")
-        or getpass.getpass("Passphrase: ")
-    )
+    passphrase = resolve_passphrase(args.passphrase)
 
     if args.command == "encrypt":
         out_path = args.out or (args.keyfile + ".enc")
@@ -145,10 +168,12 @@ def main():
     elif args.command == "decrypt":
         plaintext = decrypt_keyfile(args.keyfile, passphrase)
         if args.out:
-            with open(args.out, "wb") as f:
-                f.write(plaintext)
-            os.chmod(args.out, 0o600)
-            print(f"✅ Decrypted → {args.out}", file=sys.stderr)
+            plaintext_buf = to_secure_buffer(plaintext)
+            try:
+                atomic_write(args.out, bytes(plaintext_buf), mode=0o600)
+                print(f"✅ Decrypted → {args.out}", file=sys.stderr)
+            finally:
+                secure_zero(plaintext_buf)
         else:
             sys.stdout.buffer.write(plaintext)
 

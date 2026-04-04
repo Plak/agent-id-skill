@@ -7,6 +7,11 @@ import sys
 
 import requests
 
+try:
+    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer
+except ImportError:
+    from crypto_utils import atomic_write, secure_zero, to_secure_buffer
+
 
 DEFAULT_VAULT_ADDR = "https://127.0.0.1:8200"
 
@@ -50,29 +55,35 @@ def request_headers(token: str) -> dict[str, str]:
 
 def write_json_file(path: str, payload: dict) -> None:
     """Write JSON with restrictive permissions."""
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(payload, handle, indent=2)
-        handle.write("\n")
-    os.chmod(path, 0o600)
+    serialized = to_secure_buffer(json.dumps(payload, indent=2) + "\n")
+    try:
+        atomic_write(path, bytes(serialized), mode=0o600)
+    finally:
+        secure_zero(serialized)
 
 
 def store_keys(vault_addr: str, token: str, input_path: str, agent_id_override: str | None) -> None:
     """Store a local agent_keys.json in KV v2."""
-    with open(input_path, "r", encoding="utf-8") as handle:
-        keys = json.load(handle)
+    with open(input_path, "rb") as handle:
+        serialized = to_secure_buffer(handle.read())
+    try:
+        keys = json.loads(bytes(serialized))
 
-    agent_id = agent_id_override or keys.get("agent_id")
-    if not agent_id:
-        fail("store requires agent_id in the input file or via --agent-id")
+        agent_id = agent_id_override or keys.get("agent_id")
+        if not agent_id:
+            fail("store requires agent_id in the input file or via --agent-id")
 
-    response = requests.post(
-        kv_data_endpoint(vault_addr, agent_id),
-        headers=request_headers(token),
-        json={"data": keys},
-        timeout=10,
-    )
-    response.raise_for_status()
-    print(f"Stored key material for agent_id {agent_id}", file=sys.stderr)
+        response = requests.post(
+            kv_data_endpoint(vault_addr, agent_id),
+            headers=request_headers(token),
+            json={"data": keys},
+            timeout=10,
+        )
+        response.raise_for_status()
+        print(f"Stored key material for agent_id {agent_id}", file=sys.stderr)
+    finally:
+        # Best-effort only: Python/requests may retain copies internally.
+        secure_zero(serialized)
 
 
 def load_keys(vault_addr: str, token: str, agent_id: str, output_path: str | None) -> None:
@@ -95,8 +106,11 @@ def load_keys(vault_addr: str, token: str, agent_id: str, output_path: str | Non
         print(f"Wrote key material for agent_id {agent_id} to {output_path}", file=sys.stderr)
         return
 
-    json.dump(keys, sys.stdout, indent=2)
-    sys.stdout.write("\n")
+    serialized = to_secure_buffer(json.dumps(keys, indent=2) + "\n")
+    try:
+        sys.stdout.write(bytes(serialized).decode())
+    finally:
+        secure_zero(serialized)
 
 
 def delete_keys(vault_addr: str, token: str, agent_id: str) -> None:
