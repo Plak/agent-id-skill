@@ -18,6 +18,19 @@ description: >
 
 **Base URL:** `https://agent-id.io/v1`
 
+## Setup (pinned dependencies)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+```
+
+Dependency policy:
+- Runtime dependencies are pinned in `requirements.txt`
+- Dev/test dependencies are pinned in `requirements-dev.txt`
+- On updates: bump pins intentionally, run `pip-audit`, then run `pytest -v`
+
 ---
 
 ## 1. Register a New Agent
@@ -256,8 +269,8 @@ rm agent_keys.json  # delete plaintext
 
 # Decrypt on use (preferred: interactive prompt)
 python3 scripts/secure_keyfile.py decrypt agent_keys.json.enc --out /tmp/keys.json
-python3 scripts/authenticate.py /tmp/keys.json
-rm /tmp/keys.json  # delete immediately after use
+python3 scripts/authenticate.py /tmp/keys.json --save-token /tmp/agent_token.jwt
+rm /tmp/keys.json /tmp/agent_token.jwt  # delete immediately after use
 
 # Less safe fallback: passphrase via environment variable
 AGENT_KEY_PASSPHRASE="<strong-passphrase>" python3 scripts/secure_keyfile.py encrypt agent_keys.json
@@ -306,7 +319,7 @@ All scripts are in `scripts/`. See each file's header for usage.
 | Script | Purpose |
 |--------|---------|
 | `scripts/register.py` | Full registration incl. PoW challenge/solve |
-| `scripts/authenticate.py` | Auth flow → JWT token |
+| `scripts/authenticate.py` | Auth flow → JWT token (`--save-token` or `--print-token`) |
 | `scripts/keygen.py` | Generate Ed25519 + X25519 keypair → `agent_keys.json` |
 | `scripts/sign_challenge.py` | Sign auth challenge manually → `signed_challenge.json` |
 | `scripts/rotate_keys.py` | Generate new keypair + rotation signature |

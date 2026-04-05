@@ -12,7 +12,7 @@ Usage:
 
 Outputs the auth/verify payload as JSON.
 
-Requires: pip install cryptography
+Requires: pip install -r requirements.txt
 """
 import argparse
 import base64
@@ -29,7 +29,7 @@ try:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
 except ImportError:
-    print("Error: 'cryptography' required. Run: pip install cryptography", file=sys.stderr)
+    print("Error: 'cryptography' required. Run: pip install -r requirements.txt", file=sys.stderr)
     sys.exit(1)
 
 RP_ID = "agent-id.io"
