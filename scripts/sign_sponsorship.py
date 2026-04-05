@@ -8,7 +8,7 @@ Usage:
 
 Output: JSON with "sponsor_signature" ready for POST /sponsorship/requests/{id}/approve
 
-Requires: pip install cryptography
+Requires: pip install -r requirements.txt
 """
 import argparse
 import base64
@@ -23,7 +23,7 @@ except ImportError:
 try:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 except ImportError:
-    print("Error: 'cryptography' package required. Run: pip install cryptography", file=sys.stderr)
+    print("Error: 'cryptography' package required. Run: pip install -r requirements.txt", file=sys.stderr)
     sys.exit(1)
 
 

@@ -13,7 +13,7 @@ Usage:
     python3 register.py --name "my-agent"
     python3 register.py --name "my-agent" --keys agent_keys.json
 
-Requires: pip install cryptography requests
+Requires: pip install -r requirements.txt
 """
 import argparse
 import base64
@@ -24,18 +24,18 @@ import sys
 import time
 
 try:
-    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer, resolve_api_base
+    from .crypto_utils import atomic_write, atomic_write_new, secure_zero, to_secure_buffer, resolve_api_base
     from .keygen import resolve_output_path
     from .secure_keyfile import encrypt_key_material, resolve_passphrase
 except ImportError:
-    from crypto_utils import atomic_write, secure_zero, to_secure_buffer, resolve_api_base
+    from crypto_utils import atomic_write, atomic_write_new, secure_zero, to_secure_buffer, resolve_api_base
     from keygen import resolve_output_path
     from secure_keyfile import encrypt_key_material, resolve_passphrase
 
 try:
     import requests
 except ImportError:
-    print("Error: 'requests' required. Run: pip install requests", file=sys.stderr)
+    print("Error: 'requests' required. Run: pip install -r requirements.txt", file=sys.stderr)
     sys.exit(1)
 
 try:
@@ -43,7 +43,7 @@ try:
     from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
 except ImportError:
-    print("Error: 'cryptography' required. Run: pip install cryptography", file=sys.stderr)
+    print("Error: 'cryptography' required. Run: pip install -r requirements.txt", file=sys.stderr)
     sys.exit(1)
 
 API_BASE = resolve_api_base()
@@ -193,14 +193,23 @@ def main():
 
     payload_buf = to_secure_buffer(json.dumps(keys, indent=2))
     try:
+        writer = atomic_write if args.overwrite else atomic_write_new
         if args.encrypt:
-            encrypt_key_material(bytes(payload_buf), output_path, resolve_passphrase(args.passphrase))
+            encrypt_key_material(
+                bytes(payload_buf),
+                output_path,
+                resolve_passphrase(args.passphrase),
+                overwrite=args.overwrite,
+            )
         else:
-            atomic_write(output_path, bytes(payload_buf), mode=0o600)
+            writer(output_path, bytes(payload_buf), mode=0o600)
             print(
                 f"Warning: plaintext private keys were written to {output_path}. Encrypt this file immediately.",
                 file=sys.stderr,
             )
+    except FileExistsError:
+        print(f"Error: {output_path} already exists. Use --overwrite to replace.", file=sys.stderr)
+        sys.exit(1)
     finally:
         secure_zero(payload_buf)
 

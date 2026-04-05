@@ -21,7 +21,7 @@ Output:
     agent_pgp_public.asc    PGP public key (ASCII-armored, importable with gpg)
     agent_pgp_private.asc   PGP private key (ASCII-armored, importable with gpg)
 
-Requires: pip install cryptography
+Requires: pip install -r requirements.txt
 """
 import argparse
 import base64
@@ -34,16 +34,16 @@ import time
 from datetime import datetime, timezone
 
 try:
-    from .crypto_utils import secure_zero, to_secure_buffer
+    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer
 except ImportError:
-    from crypto_utils import secure_zero, to_secure_buffer
+    from crypto_utils import atomic_write, secure_zero, to_secure_buffer
 
 try:
     from cryptography.hazmat.primitives.kdf.hkdf import HKDF
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 except ImportError:
-    print("Error: 'cryptography' required. pip install cryptography", file=sys.stderr)
+    print("Error: 'cryptography' required. Run: pip install -r requirements.txt", file=sys.stderr)
     sys.exit(1)
 
 
@@ -72,9 +72,8 @@ def write_ssh_keys(ssh_seed: bytes, out_dir: str, comment: str) -> tuple:
 
     priv_path = os.path.join(out_dir, "id_agent_ed25519")
     pub_path = os.path.join(out_dir, "id_agent_ed25519.pub")
-    with open(priv_path, "wb") as f: f.write(priv_pem)
-    os.chmod(priv_path, 0o600)
-    with open(pub_path, "w") as f: f.write(pub_line)
+    atomic_write(priv_path, priv_pem, mode=0o600)
+    atomic_write(pub_path, pub_line, mode=0o644)
     return priv_path, pub_path
 
 
@@ -214,9 +213,8 @@ def write_pgp_keys(pgp_seed: bytes, out_dir: str, uid: str) -> tuple:
 
     pub_path = os.path.join(out_dir, "agent_pgp_public.asc")
     priv_path = os.path.join(out_dir, "agent_pgp_private.asc")
-    with open(pub_path, "w") as f: f.write(armor(pub_cert, "PUBLIC KEY BLOCK"))
-    with open(priv_path, "w") as f: f.write(armor(sec_cert, "PRIVATE KEY BLOCK"))
-    os.chmod(priv_path, 0o600)
+    atomic_write(pub_path, armor(pub_cert, "PUBLIC KEY BLOCK"), mode=0o644)
+    atomic_write(priv_path, armor(sec_cert, "PRIVATE KEY BLOCK"), mode=0o600)
 
     fp = pgp_fingerprint(pub_body)
     return priv_path, pub_path, fp.hex().upper()

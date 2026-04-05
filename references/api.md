@@ -685,7 +685,7 @@ Register additional passkey. Auth required.
 {
   "new_public_sign_key": "base64 (Ed25519)",
   "new_public_enc_key": "base64 (X25519)",
-  "rotation_signature": "base64 (old private key signs new public_sign_key)"
+  "rotation_signature": "base64 (old private key signs context || new_public_sign_key || new_public_enc_key)"
 }
 ```
 
@@ -700,6 +700,10 @@ Register additional passkey. Auth required.
 ```
 
 **Errors:** `403 not_owner`, `400 invalid_signature`
+
+**Rollout compatibility note:**
+- Legacy clients may still sign only `new_public_sign_key`.
+- During migration, backend should dual-accept legacy and v2 signatures, then retire legacy verification.
 
 ---
 

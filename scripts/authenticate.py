@@ -7,12 +7,12 @@ WebAuthn assertion flow:
   signature = Ed25519.Sign(private_key, signedData)
 
 Usage:
-    python3 authenticate.py agent_keys.json
     python3 authenticate.py agent_keys.json --save-token token.txt
+    python3 authenticate.py agent_keys.json --print-token
 
-Prints token to stdout. Token valid 15 minutes.
+Token output is explicit-only. Token valid 15 minutes.
 
-Requires: pip install cryptography requests
+Requires: pip install -r requirements.txt
 """
 import argparse
 import base64
@@ -29,14 +29,14 @@ except ImportError:
 try:
     import requests
 except ImportError:
-    print("Error: 'requests' required. Run: pip install requests", file=sys.stderr)
+    print("Error: 'requests' required. Run: pip install -r requirements.txt", file=sys.stderr)
     sys.exit(1)
 
 try:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
 except ImportError:
-    print("Error: 'cryptography' required. Run: pip install cryptography", file=sys.stderr)
+    print("Error: 'cryptography' required. Run: pip install -r requirements.txt", file=sys.stderr)
     sys.exit(1)
 
 API_BASE = resolve_api_base()
@@ -52,7 +52,15 @@ def main():
     parser = argparse.ArgumentParser(description="Authenticate to agent-id.io")
     parser.add_argument("keys_file", help="Path to agent_keys.json")
     parser.add_argument("--save-token", help="Save token to this file")
+    parser.add_argument("--print-token", action="store_true", help="Print token to stdout (explicit opt-in)")
     args = parser.parse_args()
+
+    if not args.save_token and not args.print_token:
+        print(
+            "Error: token output is disabled by default. Use --save-token <path> or --print-token.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     with open(args.keys_file) as f:
         keys = json.load(f)
@@ -124,10 +132,12 @@ def main():
 
         if args.save_token:
             write_secret_file(args.save_token, token)
-            print(f"✅ Token saved to {args.save_token} (expires {expires_at})", file=sys.stderr)
-        else:
+            print(f"✅ Token saved to {args.save_token}", file=sys.stderr)
+
+        if args.print_token:
             print(token)
-            print(f"# Expires: {expires_at}", file=sys.stderr)
+
+        print(f"# Expires: {expires_at}", file=sys.stderr)
     finally:
         secure_zero(priv_buf)
         if private_key is not None:
