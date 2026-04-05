@@ -20,7 +20,7 @@ def to_secure_buffer(data: bytes | str) -> bytearray:
 
 
 def atomic_write(path: str, content: bytes | str, mode: int = 0o600) -> None:
-    """Atomically write secret content to a file with the requested permissions."""
+    """Atomically write content by replacing destination with a temp file."""
     data = content.encode() if isinstance(content, str) else content
     directory = os.path.dirname(path) or "."
     dir_fd = os.open(directory, os.O_RDONLY)
@@ -33,7 +33,7 @@ def atomic_write(path: str, content: bytes | str, mode: int = 0o600) -> None:
         while total_written < len(data):
             written = os.write(fd, data[total_written:])
             if written == 0:
-                raise OSError(f"Short write while writing secret file: {path}")
+                raise OSError(f"Short write while writing file: {path}")
             total_written += written
         os.fsync(fd)
         os.replace(temp_path, path)
@@ -45,6 +45,29 @@ def atomic_write(path: str, content: bytes | str, mode: int = 0o600) -> None:
         if temp_path and os.path.exists(temp_path):
             os.unlink(temp_path)
         raise
+    finally:
+        if fd is not None:
+            os.close(fd)
+        os.close(dir_fd)
+
+
+def atomic_write_new(path: str, content: bytes | str, mode: int = 0o600) -> None:
+    """Create a new file atomically; fail with FileExistsError if destination exists."""
+    data = content.encode() if isinstance(content, str) else content
+    directory = os.path.dirname(path) or "."
+    dir_fd = os.open(directory, os.O_RDONLY)
+    fd = None
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    try:
+        fd = os.open(path, flags, mode)
+        total_written = 0
+        while total_written < len(data):
+            written = os.write(fd, data[total_written:])
+            if written == 0:
+                raise OSError(f"Short write while creating file: {path}")
+            total_written += written
+        os.fsync(fd)
+        os.fsync(dir_fd)
     finally:
         if fd is not None:
             os.close(fd)

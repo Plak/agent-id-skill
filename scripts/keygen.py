@@ -16,10 +16,10 @@ import os
 import sys
 
 try:
-    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer
+    from .crypto_utils import atomic_write, atomic_write_new, secure_zero, to_secure_buffer
     from .secure_keyfile import encrypt_key_material, resolve_passphrase
 except ImportError:
-    from crypto_utils import atomic_write, secure_zero, to_secure_buffer
+    from crypto_utils import atomic_write, atomic_write_new, secure_zero, to_secure_buffer
     from secure_keyfile import encrypt_key_material, resolve_passphrase
 
 try:
@@ -27,7 +27,7 @@ try:
     from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
 except ImportError:
-    print("Error: 'cryptography' package required. Run: pip install cryptography", file=sys.stderr)
+    print("Error: 'cryptography' package required. Run: pip install -r requirements.txt", file=sys.stderr)
     sys.exit(1)
 
 
@@ -80,14 +80,23 @@ def main():
 
         payload_buf = to_secure_buffer(json.dumps(keys, indent=2))
         try:
+            writer = atomic_write if args.overwrite else atomic_write_new
             if args.encrypt:
-                encrypt_key_material(bytes(payload_buf), output_path, resolve_passphrase(args.passphrase))
+                encrypt_key_material(
+                    bytes(payload_buf),
+                    output_path,
+                    resolve_passphrase(args.passphrase),
+                    overwrite=args.overwrite,
+                )
             else:
-                atomic_write(output_path, bytes(payload_buf), mode=0o600)
+                writer(output_path, bytes(payload_buf), mode=0o600)
                 print(
                     f"Warning: plaintext private keys were written to {output_path}. Encrypt this file immediately.",
                     file=sys.stderr,
                 )
+        except FileExistsError:
+            print(f"Error: {output_path} already exists. Use --overwrite to replace.", file=sys.stderr)
+            sys.exit(1)
         finally:
             secure_zero(payload_buf)
 

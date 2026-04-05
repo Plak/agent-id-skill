@@ -12,7 +12,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
 
-from scripts.crypto_utils import atomic_write, secure_zero, to_secure_buffer
+from scripts.crypto_utils import atomic_write, atomic_write_new, secure_zero, to_secure_buffer
 from scripts.register import generate_keypair, solve_pow
 from scripts.secure_keyfile import encrypt_keyfile, decrypt_keyfile
 
@@ -132,6 +132,17 @@ def test_atomic_write_replaces_existing_file(tmp_path):
 
     assert target.read_text() == "new-secret"
     assert os.stat(target).st_mode & 0o777 == 0o600
+
+
+def test_atomic_write_new_fails_if_target_exists(tmp_path):
+    """atomic_write_new should fail if the destination already exists."""
+    target = tmp_path / "secret.txt"
+    target.write_text("old")
+
+    with pytest.raises(FileExistsError):
+        atomic_write_new(str(target), "new-secret", mode=0o600)
+
+    assert target.read_text() == "old"
 
 
 # ---------- Test 5: Deterministic key derivation ----------

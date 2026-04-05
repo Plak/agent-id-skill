@@ -19,7 +19,7 @@ Usage:
 The passphrase should be stored in the agent's secure vault (e.g., OpenBao, env var, or
 OpenClaw secret store) — NOT hardcoded in any script or config file.
 
-Requires: pip install cryptography
+Requires: pip install -r requirements.txt
 """
 import argparse
 import base64
@@ -29,16 +29,16 @@ import os
 import sys
 
 try:
-    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer
+    from .crypto_utils import atomic_write, atomic_write_new, secure_zero, to_secure_buffer
 except ImportError:
-    from crypto_utils import atomic_write, secure_zero, to_secure_buffer
+    from crypto_utils import atomic_write, atomic_write_new, secure_zero, to_secure_buffer
 
 try:
     from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     from cryptography.exceptions import InvalidTag
 except ImportError:
-    print("Error: 'cryptography' required. pip install cryptography", file=sys.stderr)
+    print("Error: 'cryptography' required. Run: pip install -r requirements.txt", file=sys.stderr)
     sys.exit(1)
 
 MAGIC = b"AGENTKEY1"  # file format identifier
@@ -57,6 +57,7 @@ def encrypt_key_material(
     output_path: str,
     passphrase: str,
     scrypt_n: int = SCRYPT_N,
+    overwrite: bool = True,
 ) -> None:
     """Encrypt key material from memory without persisting plaintext to disk."""
     plaintext_buf = to_secure_buffer(plaintext)
@@ -77,7 +78,8 @@ def encrypt_key_material(
 
         aesgcm = AESGCM(bytes(key_buf))
         ciphertext = MAGIC + salt + nonce + aesgcm.encrypt(nonce, bytes(plaintext_buf), None)
-        atomic_write(output_path, ciphertext, mode=0o600)
+        writer = atomic_write if overwrite else atomic_write_new
+        writer(output_path, ciphertext, mode=0o600)
     finally:
         secure_zero(plaintext_buf)
         if key_buf:
@@ -89,13 +91,20 @@ def encrypt_keyfile(
     output_path: str,
     passphrase: str,
     scrypt_n: int = SCRYPT_N,
+    overwrite: bool = True,
 ) -> None:
     with open(plaintext_path, "rb") as f:
         raw = f.read()
     # Use secure buffer so the plaintext is zeroable after use
     plaintext_buf = to_secure_buffer(raw)
     try:
-        encrypt_key_material(bytes(plaintext_buf), output_path, passphrase, scrypt_n=scrypt_n)
+        encrypt_key_material(
+            bytes(plaintext_buf),
+            output_path,
+            passphrase,
+            scrypt_n=scrypt_n,
+            overwrite=overwrite,
+        )
     finally:
         secure_zero(plaintext_buf)
 

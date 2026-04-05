@@ -217,6 +217,34 @@ def test_rotate_keys_keeps_display_name_optional(tmp_path, tmp_keys, monkeypatch
     assert "display_name" not in new_keys
 
 
+def test_rotate_keys_without_overwrite_does_not_replace_existing_outputs(tmp_path, tmp_keys, monkeypatch):
+    """Manual rotation should not clobber existing output artifacts without --overwrite."""
+    keys_path, _ = tmp_keys
+    new_keys_path = tmp_path / "new_agent_keys.json"
+    payload_path = tmp_path / "rotation_payload.json"
+    new_keys_path.write_text("existing-new")
+    payload_path.write_text("existing-payload")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "rotate_keys.py",
+            keys_path,
+            "--new-keys",
+            str(new_keys_path),
+            "--payload",
+            str(payload_path),
+        ],
+    )
+
+    with pytest.raises(SystemExit):
+        rotate_keys.main()
+
+    assert new_keys_path.read_text() == "existing-new"
+    assert payload_path.read_text() == "existing-payload"
+
+
 def test_keygen_encrypt_creates_encrypted_output_only(tmp_path, monkeypatch):
     """--encrypt should write only the encrypted keyfile and no plaintext sibling."""
     output_path = tmp_path / "agent_keys.json"
@@ -259,6 +287,27 @@ def test_keygen_plaintext_mode_warns(tmp_path, monkeypatch, capsys):
     captured = capsys.readouterr()
     assert output_path.exists()
     assert "plaintext private keys were written" in captured.err
+
+
+def test_keygen_without_overwrite_does_not_replace_existing_file(tmp_path, monkeypatch):
+    """Existing key files must not be replaced unless --overwrite is provided."""
+    output_path = tmp_path / "agent_keys.json"
+    output_path.write_text("existing")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "keygen.py",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    with pytest.raises(SystemExit):
+        keygen.main()
+
+    assert output_path.read_text() == "existing"
 
 
 @responses.activate
@@ -339,6 +388,31 @@ def test_register_plaintext_mode_warns(tmp_path, monkeypatch, capsys):
     captured = capsys.readouterr()
     assert output_path.exists()
     assert "plaintext private keys were written" in captured.err
+
+
+@responses.activate
+def test_register_without_overwrite_does_not_replace_existing_file(tmp_path, monkeypatch):
+    """Existing registration key files must not be replaced without --overwrite."""
+    output_path = tmp_path / "registered_keys.json"
+    output_path.write_text("existing")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "register.py",
+            "--name",
+            "test",
+            "--keys",
+            str(output_path),
+        ],
+    )
+
+    with pytest.raises(SystemExit):
+        register.main()
+
+    assert output_path.read_text() == "existing"
+    assert len(responses.calls) == 0
 
 
 @responses.activate
