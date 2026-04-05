@@ -3,7 +3,7 @@
 Generate a new Ed25519 + X25519 keypair and create or apply a rotation request.
 
 The rotation signature proves ownership of the old keypair by signing
-the new public_sign_key with the old private key.
+both new public keys (sign + encryption) with the old private key.
 
 Usage:
     python3 rotate_keys.py agent_keys.json
@@ -14,7 +14,7 @@ Default mode is manual: it writes the new key material and a POST payload
 for the caller to submit. Use --apply to POST the rotation and atomically
 replace the original key file only after the API accepts the new keys.
 
-Requires: pip install cryptography requests
+Requires: pip install -r requirements.txt
 """
 import argparse
 import base64
@@ -25,23 +25,29 @@ import sys
 try:
     import requests
 except ImportError:
-    print("Error: 'requests' package required. Run: pip install requests", file=sys.stderr)
+    print("Error: 'requests' package required. Run: pip install -r requirements.txt", file=sys.stderr)
     sys.exit(1)
 
 try:
-    from .crypto_utils import atomic_write, secure_zero, to_secure_buffer, resolve_api_base
+    from .crypto_utils import atomic_write, atomic_write_new, secure_zero, to_secure_buffer, resolve_api_base
 except ImportError:
-    from crypto_utils import atomic_write, secure_zero, to_secure_buffer, resolve_api_base
+    from crypto_utils import atomic_write, atomic_write_new, secure_zero, to_secure_buffer, resolve_api_base
 
 try:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
 except ImportError:
-    print("Error: 'cryptography' package required. Run: pip install cryptography", file=sys.stderr)
+    print("Error: 'cryptography' package required. Run: pip install -r requirements.txt", file=sys.stderr)
     sys.exit(1)
 
 API_BASE = resolve_api_base()
+ROTATION_SIG_CONTEXT = b"agent-id:rotate:v2:"
+
+
+def build_rotation_signature_message(new_sign_pub_bytes: bytes, new_enc_pub_bytes: bytes) -> bytes:
+    """Build canonical rotation-signature bytes with explicit domain separation."""
+    return ROTATION_SIG_CONTEXT + new_sign_pub_bytes + new_enc_pub_bytes
 
 
 def build_rotation_material(old_keys: dict) -> tuple[dict, dict]:
@@ -70,7 +76,8 @@ def build_rotation_material(old_keys: dict) -> tuple[dict, dict]:
         )
         new_enc_pub_bytes = new_enc_public.public_bytes(Encoding.Raw, PublicFormat.Raw)
 
-        rotation_signature = old_private_key.sign(new_sign_pub_bytes)
+        rotation_signature_input = build_rotation_signature_message(new_sign_pub_bytes, new_enc_pub_bytes)
+        rotation_signature = old_private_key.sign(rotation_signature_input)
 
         new_keys = {
             "warning": "KEEP THIS FILE SECRET. Never share private keys.",
@@ -167,8 +174,14 @@ def main():
             print(f"✅ Backup saved → {backup_path}")
             return
 
-        atomic_write(args.new_keys, bytes(new_keys_buf), mode=0o600)
-        atomic_write(args.payload, bytes(payload_buf), mode=0o600)
+        writer = atomic_write if args.overwrite else atomic_write_new
+        try:
+            writer(args.new_keys, bytes(new_keys_buf), mode=0o600)
+            writer(args.payload, bytes(payload_buf), mode=0o600)
+        except FileExistsError as exc:
+            existing_path = exc.filename or str(exc)
+            print(f"Error: {existing_path} already exists. Use --overwrite to replace.", file=sys.stderr)
+            sys.exit(1)
 
         print(f"✅ New keys → {args.new_keys}")
         print(f"✅ Rotation payload → {args.payload}")
