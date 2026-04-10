@@ -25,6 +25,7 @@ Requires: pip install -r requirements.txt
 """
 import argparse
 import base64
+import binascii
 import hashlib
 import json
 import os
@@ -51,6 +52,25 @@ def derive_child_seed(master_seed: bytes, info: str) -> bytes:
     """HKDF-SHA256: derive 32-byte child seed from master_seed."""
     return HKDF(algorithm=hashes.SHA256(), length=32, salt=None,
                 info=info.encode()).derive(master_seed)
+
+
+def decode_master_seed(keys: dict) -> bytearray:
+    """Decode and validate sign_private_key from keys json."""
+    encoded_seed = keys.get("sign_private_key")
+    if not isinstance(encoded_seed, str):
+        raise ValueError("sign_private_key is missing or not a string")
+
+    try:
+        master_seed = base64.b64decode(encoded_seed, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("sign_private_key is not valid base64") from exc
+
+    if len(master_seed) != 32:
+        raise ValueError(
+            f"sign_private_key must decode to exactly 32 bytes (got {len(master_seed)})"
+        )
+
+    return to_secure_buffer(master_seed)
 
 
 # ── SSH ──────────────────────────────────────────────────────────────────────
@@ -238,11 +258,11 @@ def main():
     uid = args.uid or f"{agent_id} <{agent_id}@agent-id.io>"
     comment = args.comment or f"{agent_id}@agent-id.io"
 
-    priv_buf = to_secure_buffer(base64.b64decode(keys["sign_private_key"]))
+    priv_buf = bytearray()
     ssh_seed = bytearray()
     pgp_seed = bytearray()
     try:
-        assert len(priv_buf) == 32, f"Expected 32-byte seed, got {len(priv_buf)}"
+        priv_buf = decode_master_seed(keys)
 
         os.makedirs(args.out_dir, exist_ok=True)
 
@@ -273,8 +293,12 @@ def main():
 
         print("ℹ️  Keys are DETERMINISTIC — regenerate anytime from agent_keys.json")
         print("   Keep agent_keys.json encrypted: python3 scripts/secure_keyfile.py encrypt agent_keys.json")
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
     finally:
-        secure_zero(priv_buf)
+        if priv_buf:
+            secure_zero(priv_buf)
         if ssh_seed:
             secure_zero(ssh_seed)
         if pgp_seed:
