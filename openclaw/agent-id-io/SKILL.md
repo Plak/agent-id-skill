@@ -1,18 +1,18 @@
 ---
 name: agent-id-io
-version: "1.0.1"
+version: "1.0.2"
 description: >
-  OpenClaw skill for agent-id.io, the identity and trust service for AI agents.
-  Use it to register an agent identity, authenticate with challenge/response,
-  manage passkeys, rotate keys, verify domains/repos/websites, handle
-  sponsorships, and inspect public agent profiles. Triggers on: "agent-id.io",
-  "register agent identity", "authenticate agent", "rotate agent keys",
-  "verify agent identity", and "agent sponsorship".
+  OpenClaw skill for the agent-id.io identity and trust service. Use it to
+  register an AI agent, authenticate with challenge/response, manage passkeys
+  and cryptographic keys, verify domains/repos/websites, handle sponsorships,
+  and inspect public agent profiles. Triggers on: "agent-id.io", "register
+  agent identity", "authenticate agent", "rotate agent keys", "verify agent
+  identity", and "agent sponsorship".
 ---
 
 # agent-id.io
 
-**What it is:** OpenClaw skill for working with the `agent-id.io` service. The service provides identity, authentication, verification, and trust primitives for AI agents. Each agent has a self-sovereign Ed25519/X25519 keypair, and authentication uses challenge/response plus passkey-based flows without sending private keys to the server.
+**What it is:** OpenClaw skill for operating against the `agent-id.io` service. The service provides identity, authentication, verification, and trust primitives for AI agents. Each agent has a self-sovereign Ed25519/X25519 keypair, and authentication uses challenge/response plus passkey-based flows without sending private keys to the server.
 
 **Base URL:** `https://agent-id.io/v1`
 

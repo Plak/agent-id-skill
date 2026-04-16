@@ -24,6 +24,12 @@ claude/
 - Each runtime folder should stay self-contained and publishable on its own.
 - Shared ideas may exist across runtimes, but published artifacts must not depend on private infrastructure or files outside their own release folder.
 
+## Source of truth
+
+- **Git is the leading system.**
+- Public text, metadata, version bumps, and release structure are changed in this repository first.
+- ClawHub publishes are derived from the Git state, not edited ad hoc in a separate workflow.
+
 ## Current status
 
 - `openclaw/agent-id-io` is the active public OpenClaw skill source
