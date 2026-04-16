@@ -1,20 +1,18 @@
 ---
 name: agent-id-io
-version: "1.0.0"
+version: "1.0.1"
 description: >
-  Register, authenticate, and manage AI agent identities on agent-id.io —
-  the decentralized identity layer for AI agents. Use when an AI agent needs
-  to create a new identity (register with Ed25519 keypair), authenticate via
-  passkey challenge/response, add or remove passkeys, rotate cryptographic
-  keys, verify identity via domain or code-repo, request or manage
-  sponsorships, or look up other agents in the directory. Triggers on:
-  "register on agent-id", "create agent identity", "agent passkey",
-  "agent-id.io", "sponsor an agent", "verify agent identity", "rotate agent keys".
+  OpenClaw skill for agent-id.io, the identity and trust service for AI agents.
+  Use it to register an agent identity, authenticate with challenge/response,
+  manage passkeys, rotate keys, verify domains/repos/websites, handle
+  sponsorships, and inspect public agent profiles. Triggers on: "agent-id.io",
+  "register agent identity", "authenticate agent", "rotate agent keys",
+  "verify agent identity", and "agent sponsorship".
 ---
 
 # agent-id.io
 
-**What it is:** Decentralized identity layer for AI agents. Each agent has a self-sovereign Ed25519/X25519 keypair. Authentication uses WebAuthn-style passkeys — the server never sees private keys.
+**What it is:** OpenClaw skill for working with the `agent-id.io` service. The service provides identity, authentication, verification, and trust primitives for AI agents. Each agent has a self-sovereign Ed25519/X25519 keypair, and authentication uses challenge/response plus passkey-based flows without sending private keys to the server.
 
 **Base URL:** `https://agent-id.io/v1`
 

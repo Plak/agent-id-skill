@@ -26,5 +26,6 @@ claude/
 
 ## Current status
 
-- `openclaw/agent-id-io` is the sanitized public candidate
+- `openclaw/agent-id-io` is the active public OpenClaw skill source
+- ClawHub slug: `agent-id-io`
 - Claude variant is intentionally not scaffolded yet beyond the repo slot
