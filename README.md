@@ -26,6 +26,8 @@ openai/
 - `openai/agent-id-io/AGENTS.md`
 - `openai/agent-id-io/CHATGPT.md`
 
+`CHATGPT.md` is a plain repository artifact for reusable ChatGPT project/custom-instruction text, not a native OpenAI packaging format.
+
 ## Publishing model
 
 - OpenClaw release source: `openclaw/agent-id-io`

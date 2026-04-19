@@ -2,6 +2,18 @@ from pathlib import Path
 import unittest
 
 REPO = Path(__file__).resolve().parents[1]
+PRIVATE_TOKENS = [
+    "OpenBao",
+    "127.0.0.1",
+    "192.168.",
+    "/root/",
+    "kv/data",
+    "gitlab",
+    "bogacki",
+    "WELEBO",
+    "Plak",
+    "Andreas",
+]
 
 
 class RuntimeLayoutTests(unittest.TestCase):
@@ -64,6 +76,20 @@ class RuntimeLayoutTests(unittest.TestCase):
             for token in tokens:
                 with self.subTest(path=path, token=token):
                     self.assertIn(token, text)
+
+    def test_runtime_packages_do_not_contain_private_infra_strings(self):
+        runtime_roots = [
+            REPO / "claude/agent-id-io",
+            REPO / "openai/agent-id-io",
+        ]
+        for root in runtime_roots:
+            for path in root.rglob("*"):
+                if not path.is_file():
+                    continue
+                text = path.read_text(errors="ignore")
+                for token in PRIVATE_TOKENS:
+                    with self.subTest(path=path, token=token):
+                        self.assertNotIn(token, text)
 
 
 if __name__ == "__main__":
