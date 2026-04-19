@@ -1,12 +1,12 @@
 # agent-id-skill
 
-Public source repository for agent-id skills across multiple agent runtimes.
+Public source repository for agent-id workflows across multiple agent runtimes.
 
 ## Goals
 
 - keep the public OpenClaw skill publishable from this repo
-- prepare a clean home for a future Claude-oriented variant
-- avoid coupling published skills to private infrastructure or internal repos
+- ship dedicated Claude and OpenAI runtime variants without private coupling
+- keep each runtime package self-contained and publishable on its own
 
 ## Layout
 
@@ -14,24 +14,33 @@ Public source repository for agent-id skills across multiple agent runtimes.
 openclaw/
   agent-id-io/      # publishable OpenClaw skill
 claude/
-  # next iteration lives here
+  agent-id-io/      # Claude-oriented runtime package
+openai/
+  agent-id-io/      # Codex and ChatGPT runtime package
 ```
+
+## Runtime entrypoints
+
+- `openclaw/agent-id-io/SKILL.md`
+- `claude/agent-id-io/CLAUDE.md`
+- `openai/agent-id-io/AGENTS.md`
+- `openai/agent-id-io/CHATGPT.md`
 
 ## Publishing model
 
 - OpenClaw release source: `openclaw/agent-id-io`
-- Future Claude release source: a dedicated folder under `claude/`
-- Each runtime folder should stay self-contained and publishable on its own.
+- Claude release source: `claude/agent-id-io`
+- OpenAI release source: `openai/agent-id-io`
 - Shared ideas may exist across runtimes, but published artifacts must not depend on private infrastructure or files outside their own release folder.
 
 ## Source of truth
 
 - **Git is the leading system.**
 - Public text, metadata, version bumps, and release structure are changed in this repository first.
-- ClawHub publishes are derived from the Git state, not edited ad hoc in a separate workflow.
+- Runtime-specific publish steps should always be derived from the Git state.
 
 ## Current status
 
 - `openclaw/agent-id-io` is the active public OpenClaw skill source
-- ClawHub slug: `agent-id-io`
-- Claude variant is intentionally not scaffolded yet beyond the repo slot
+- `claude/agent-id-io` is now scaffolded for Claude-specific instruction loading
+- `openai/agent-id-io` is now scaffolded for Codex and ChatGPT usage
