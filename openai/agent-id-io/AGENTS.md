@@ -13,16 +13,26 @@ Use this package when the task involves `agent-id.io`, including:
 - Generate private keys locally, never on the remote service.
 - Keep `agent_keys.json` secret and prefer encrypted storage.
 - Prefer the provided Python helpers in `scripts/` instead of hand-rolled crypto.
-- Read `references/api.md` when endpoint behavior, status codes, or proof formats matter.
-- For state-changing actions, call out irreversible risk briefly before executing.
+- Read `references/api.md` when endpoint behavior, status codes, proof formats, or verification semantics matter.
+- Before any mutating step, state what will change and how you will verify it.
+- If a step could lock the identity or invalidate existing credentials, call that out briefly before execution.
 - Never print secrets unless the user explicitly requests them.
 
 ## Workflow
 
-1. Clarify whether this is register, auth, verify, sponsorship, or lookup.
+1. Clarify whether this is register, authenticate, verify, sponsorship, rotation, derivation, or lookup.
 2. Use the helper scripts for deterministic cryptographic steps.
-3. Use the API reference for exact payloads and failure cases.
-4. Verify the resulting remote state after each mutation.
+3. Use the API reference for exact payloads, proof values, and failure cases.
+4. Execute the remote step.
+5. Verify the resulting remote state after each mutation.
+
+## Verification examples
+
+- Registration: fetch the created agent profile.
+- Authentication: confirm the protected call succeeds, not just that a token string exists.
+- Verification: confirm the verification status appears on the agent profile.
+- Rotation: confirm the remote public keys match the newly generated local keys.
+- Sponsorship: confirm the request or approval is visible through the API.
 
 ## Key commands
 

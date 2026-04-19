@@ -53,6 +53,18 @@ class RuntimeLayoutTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, readme)
 
+    def test_runtime_entrypoints_contain_verification_bias(self):
+        checks = {
+            REPO / "claude/agent-id-io/CLAUDE.md": ["verify", "state-changing", "references/api.md"],
+            REPO / "openai/agent-id-io/AGENTS.md": ["Verify", "mutating", "references/api.md"],
+            REPO / "openai/agent-id-io/CHATGPT.md": ["verify", "mutating", "references/api.md"],
+        }
+        for path, tokens in checks.items():
+            text = path.read_text()
+            for token in tokens:
+                with self.subTest(path=path, token=token):
+                    self.assertIn(token, text)
+
 
 if __name__ == "__main__":
     unittest.main()
