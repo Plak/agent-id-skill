@@ -31,6 +31,23 @@ This repository does **not** contain the `agent-id` backend service:
 
 The backend lives in the separate internal repository `agents-stack/agent-id`.
 
+## Development workflow
+
+This repository is developed **GitLab-first**.
+
+- **Canonical development repo:** internal GitLab clone
+- **Public GitHub repo:** publish and review surface for already tested results
+- **Rule:** no primary feature work in the public repo
+
+Local clone convention:
+
+- `origin` = internal GitLab repo
+- optional `github` = public GitHub repo
+
+Before anything is pushed to GitHub, it must be reviewed and tested on the GitLab side first. Public GitHub should only receive the cleaned, verified result.
+
+See `CONTRIBUTING.md` for the exact branch, review, and export flow.
+
 ## Structure
 
 ```
@@ -41,5 +58,7 @@ references/       — Reference docs and API specs
 
 ## CI
 
+- `python-test`: pytest suite
 - `python-lint`: pylint on all scripts
 - `python-security`: bandit security scan on all scripts
+- `dependency-check`: pinned dependency audit
