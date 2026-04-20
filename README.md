@@ -15,6 +15,22 @@ OpenClaw Skill: Register, authenticate, and manage AI agent identities on [agent
 
 This skill is loaded automatically by OpenClaw when tasks match its description. See `SKILL.md` for the full skill specification.
 
+## Repository boundary
+
+This repository contains the **skill/client side** of agent-id:
+
+- `SKILL.md`, helper scripts, references, tests, and packaging for the OpenClaw skill
+- agent-facing workflows for registration, authentication, rotation, verification, and sponsorship
+- distribution path to ClawHub
+
+This repository does **not** contain the `agent-id` backend service:
+
+- no Go API server
+- no database schema or migrations for the live service
+- no k8s manifests or service deployment logic
+
+The backend lives in the separate internal repository `agents-stack/agent-id`.
+
 ## Structure
 
 ```
